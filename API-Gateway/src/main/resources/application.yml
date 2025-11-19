@@ -1,0 +1,31 @@
+spring:
+  cloud:
+    gateway:
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: true
+              lower-case-service-id: true
+
+          routes:
+            - id: asset-service
+              uri: lb://asset-service
+              predicates:
+                - Path=/assets/**
+              filters:
+                - StripPrefix=1
+
+            - id: workforce-service
+              uri: lb://workforce-service
+              predicates:
+                - Path=/wf/**
+              filters:
+                - StripPrefix=1
+
+            - id: workorder-service
+              uri: lb://workorderservice
+              predicates:
+                - Path=/workorder/**
+              filters:
+                - StripPrefix=1
