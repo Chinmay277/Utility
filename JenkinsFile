@@ -15,38 +15,60 @@ pipeline {
             }
         }
 
-        stage('Detect Changed Services') {
+        stage('Detect Deployment Scope') {
             steps {
                 script {
+
+                    def diffCmd = """
+                    if [ -z "${GIT_PREVIOUS_SUCCESSFUL_COMMIT}" ]; then
+                      git diff --name-only ${GIT_COMMIT}
+                    else
+                      git diff --name-only ${GIT_PREVIOUS_SUCCESSFUL_COMMIT} ${GIT_COMMIT}
+                    fi
+                    """
+
                     def changedFiles = sh(
-                        script: "git diff --name-only HEAD~1 HEAD",
+                        script: diffCmd,
                         returnStdout: true
                     ).trim().split("\n")
 
+                    echo "Changed files: ${changedFiles}"
+
                     def services = []
+                    def fullRedeploy = false
 
                     changedFiles.each { file ->
-                        if (file.startsWith("services/")) {
-                            def serviceName = file.split("/")[1]
-                            services << serviceName
+                        if (file == "ManualReDeployer.txt") {
+                            fullRedeploy = true
                         }
+
+                        if (file.startsWith("services/")) {
+                            services << file.split("/")[1]
+                        }
+                    }
+
+                    if (fullRedeploy) {
+                        echo "Manual redeploy requested. Deploying ALL services."
+                        services = sh(
+                            script: "ls services",
+                            returnStdout: true
+                        ).trim().split("\n")
                     }
 
                     services = services.unique()
 
                     if (services.isEmpty()) {
-                        echo "No service changes detected. Skipping deployment."
-                        currentBuild.result = 'SUCCESS'
+                        echo "No deployable changes detected."
                         env.CHANGED_SERVICES = ""
                     } else {
                         env.CHANGED_SERVICES = services.join(",")
-                        echo "Changed services: ${env.CHANGED_SERVICES}"
+                        echo "Services to deploy: ${env.CHANGED_SERVICES}"
                     }
                 }
             }
         }
 
-        stage('Build & Push Changed Services') {
+        stage('Build & Push Images') {
             when {
                 expression { env.CHANGED_SERVICES?.trim() }
             }
@@ -61,7 +83,7 @@ pipeline {
                         sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
 
                         env.CHANGED_SERVICES.split(",").each { service ->
-                            echo "Building and pushing ${service}"
+                            echo "Building & pushing ${service}"
 
                             sh """
                               docker build \
@@ -76,7 +98,7 @@ pipeline {
             }
         }
 
-        stage('Deploy Changed Services to Minikube') {
+        stage('Deploy to Minikube') {
             when {
                 expression { env.CHANGED_SERVICES?.trim() }
             }
@@ -97,5 +119,4 @@ pipeline {
             }
         }
     }
-    
 }
