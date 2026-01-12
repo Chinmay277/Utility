@@ -56,7 +56,7 @@ public class AuthService {
                 LOGGER.warn("Registration attempt failed: User with email {} already exists", userCredentialsDto.getEmail());
                 throw new UserAlreadyExistsException("User with email " + userCredentialsDto.getEmail() + " already exists");
             }
-
+			
             // Map DTO to entity
             UserCredentials userCredentials = mapUserCredDtoToEntity(userCredentialsDto);
 

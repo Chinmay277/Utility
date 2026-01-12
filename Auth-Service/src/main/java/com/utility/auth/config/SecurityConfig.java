@@ -42,8 +42,7 @@ public class SecurityConfig {
     // ✅ DaoAuthenticationProvider wired via Spring
     @Bean
     public DaoAuthenticationProvider daoAuthenticationProvider(PasswordEncoder encoder) {
-        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
-        provider.setUserDetailsService(userDetailsService);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
         provider.setPasswordEncoder(encoder);
         return provider;
     }

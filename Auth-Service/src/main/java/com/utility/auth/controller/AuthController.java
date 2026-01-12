@@ -9,6 +9,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+
 
 /**
  * REST controller for authentication endpoints.
@@ -43,4 +46,10 @@ public class AuthController {
         LOGGER.info("Login attempt for email: {}", loginRequest.getEmail());
         return authService.authenticateUser(loginRequest);
     }
+
+	@GetMapping("test")
+	public String authtest() {
+		return new String("Test Done, Successful");
+	}
+	
 }
