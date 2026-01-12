@@ -19,13 +19,13 @@ pipeline {
             steps {
                 script {
 
-                    def diffCmd = """
-                    if [ -z "${GIT_PREVIOUS_SUCCESSFUL_COMMIT}" ]; then
-                        git diff --name-only ${GIT_COMMIT}
+                    def diffCmd = '''
+                    if [ -z "$GIT_PREVIOUS_SUCCESSFUL_COMMIT" ]; then
+                        git diff --name-only HEAD~1 HEAD || true
                     else
-                        git diff --name-only ${GIT_PREVIOUS_SUCCESSFUL_COMMIT} ${GIT_COMMIT}
+                        git diff --name-only $GIT_PREVIOUS_SUCCESSFUL_COMMIT $GIT_COMMIT
                     fi
-                    """
+                    '''
 
                     def changedFiles = sh(
                         script: diffCmd,
@@ -39,7 +39,7 @@ pipeline {
                     }
 
                     def changedList = changedFiles.split("\n")
-                    echo "Changed files: ${changedList}"
+                    echo "Changed files:\n${changedList}"
 
                     def services = []
                     def fullRedeploy = false
@@ -50,21 +50,28 @@ pipeline {
                             fullRedeploy = true
                         }
 
-                        // normalize service name to lowercase
                         if (file.contains("/")) {
-                            services.add(file.split("/")[0].toLowerCase())
+                            services.add(file.split("/")[0])
                         }
                     }
 
                     if (fullRedeploy) {
-                        echo "Manual redeploy requested. Deploying ALL services."
-                        services = sh(
-                            script: "ls -d */ | grep -v k8s | grep -v .git | sed 's#/##' | tr '[:upper:]' '[:lower:]'",
+                        echo "Manual redeploy triggered. Deploying ALL services."
+
+                        def allServices = sh(
+                            script: '''
+                              ls -d */ | \
+                              grep -v k8s | \
+                              grep -v .git | \
+                              sed 's#/##'
+                            ''',
                             returnStdout: true
-                        ).trim().split("\n")
+                        ).trim()
+
+                        services = allServices ? allServices.split("\n") : []
                     }
 
-                    // ---- SANDBOX-SAFE DEDUPLICATION ----
+                    // ---- SANDBOX SAFE DEDUPLICATION ----
                     def uniqueServices = []
                     services.each { svc ->
                         if (!uniqueServices.contains(svc)) {
@@ -79,13 +86,13 @@ pipeline {
                         env.CHANGED_SERVICES = ""
                     } else {
                         env.CHANGED_SERVICES = services.join(",")
-                        echo "Services to deploy: ${env.CHANGED_SERVICES}"
+                        echo "Services selected for deployment: ${env.CHANGED_SERVICES}"
                     }
                 }
             }
         }
 
-        stage('Build & Push Images') {
+        stage('Build & Push Docker Images') {
             when {
                 expression { env.CHANGED_SERVICES?.trim() }
             }
@@ -97,10 +104,12 @@ pipeline {
                         passwordVariable: 'DOCKER_PASS'
                     )]) {
 
-                        sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
+                        sh '''
+                          echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        '''
 
                         env.CHANGED_SERVICES.split(",").each { service ->
-                            echo "Building & pushing image for ${service}"
+                            echo "Building and pushing image for: ${service}"
 
                             sh """
                               docker build \
@@ -122,7 +131,7 @@ pipeline {
             steps {
                 script {
                     env.CHANGED_SERVICES.split(",").each { service ->
-                        echo "Deploying ${service}"
+                        echo "Deploying service: ${service}"
 
                         sh """
                           sed -i 's|IMAGE_PLACEHOLDER|${DOCKER_REGISTRY}/${DOCKER_REPO}:${service}-${DOCKER_TAG}|' \
@@ -134,6 +143,15 @@ pipeline {
                     }
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "Pipeline completed successfully."
+        }
+        failure {
+            echo "Pipeline failed. Check logs above."
         }
     }
 }
