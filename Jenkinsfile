@@ -21,33 +21,40 @@ pipeline {
 
                     def diffCmd = """
                     if [ -z "${GIT_PREVIOUS_SUCCESSFUL_COMMIT}" ]; then
-                      git diff --name-only ${GIT_COMMIT}
+                        git diff --name-only ${GIT_COMMIT}
                     else
-                      git diff --name-only ${GIT_PREVIOUS_SUCCESSFUL_COMMIT} ${GIT_COMMIT}
+                        git diff --name-only ${GIT_PREVIOUS_SUCCESSFUL_COMMIT} ${GIT_COMMIT}
                     fi
                     """
 
                     def changedFiles = sh(
                         script: diffCmd,
                         returnStdout: true
-                    ).trim().split("\n")
+                    ).trim()
 
-                    echo "Changed files: ${changedFiles}"
+                    if (!changedFiles) {
+                        echo "No file changes detected."
+                        env.CHANGED_SERVICES = ""
+                        return
+                    }
+
+                    def changedList = changedFiles.split("\n")
+                    echo "Changed files: ${changedList}"
 
                     def services = []
                     def fullRedeploy = false
 
-                    changedFiles.each { file ->
-
-                        // manual full redeploy trigger
+                    changedList.each { file ->
                         if (file == "ManualReDeployer.txt") {
                             fullRedeploy = true
                         }
 
-                        // detect root-level service change
-                        if (file.contains("/") && !file.startsWith("k8s/")) {
-                            def serviceName = file.split("/")[0]
-                            services << serviceName
+                        // Root-level service folders
+                        def parts = file.split("/")
+                        if (parts.length > 1 && file.endsWith("/")) {
+                            services << parts[0]
+                        } else if (parts.length > 1) {
+                            services << parts[0]
                         }
                     }
 
@@ -59,10 +66,11 @@ pipeline {
                         ).trim().split("\n")
                     }
 
-                    services = services.unique()
+                    // Jenkins sandbox-safe deduplication
+                    services = services.toSet().toList()
 
                     if (services.isEmpty()) {
-                        echo "No deployable changes detected."
+                        echo "No deployable services detected."
                         env.CHANGED_SERVICES = ""
                     } else {
                         env.CHANGED_SERVICES = services.join(",")
@@ -87,7 +95,7 @@ pipeline {
                         sh "echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin"
 
                         env.CHANGED_SERVICES.split(",").each { service ->
-                            echo "Building & pushing ${service}"
+                            echo "Building & pushing image for ${service}"
 
                             sh """
                               docker build \
@@ -109,7 +117,7 @@ pipeline {
             steps {
                 script {
                     env.CHANGED_SERVICES.split(",").each { service ->
-                        echo "Deploying ${service}"
+                        echo "Deploying ${service} to Minikube"
 
                         sh """
                           sed -i 's|IMAGE_PLACEHOLDER|${DOCKER_REGISTRY}/${DOCKER_REPO}:${service}-${DOCKER_TAG}|' \
