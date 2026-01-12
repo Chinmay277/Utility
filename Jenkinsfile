@@ -38,19 +38,23 @@ pipeline {
                     def fullRedeploy = false
 
                     changedFiles.each { file ->
+
+                        // manual full redeploy trigger
                         if (file == "ManualReDeployer.txt") {
                             fullRedeploy = true
                         }
 
-                        if (file.startsWith("services/")) {
-                            services << file.split("/")[1]
+                        // detect root-level service change
+                        if (file.contains("/") && !file.startsWith("k8s/")) {
+                            def serviceName = file.split("/")[0]
+                            services << serviceName
                         }
                     }
 
                     if (fullRedeploy) {
                         echo "Manual redeploy requested. Deploying ALL services."
                         services = sh(
-                            script: "ls services",
+                            script: "ls -d */ | grep -v k8s | grep -v .git | sed 's#/##'",
                             returnStdout: true
                         ).trim().split("\n")
                     }
@@ -88,7 +92,7 @@ pipeline {
                             sh """
                               docker build \
                                 -t ${DOCKER_REGISTRY}/${DOCKER_REPO}:${service}-${DOCKER_TAG} \
-                                services/${service}
+                                ${service}
 
                               docker push ${DOCKER_REGISTRY}/${DOCKER_REPO}:${service}-${DOCKER_TAG}
                             """
