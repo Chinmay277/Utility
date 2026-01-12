@@ -5,6 +5,7 @@ pipeline {
         DOCKER_REGISTRY = "chinmay277"
         DOCKER_REPO     = "demo2"
         DOCKER_TAG      = "${BUILD_NUMBER}"
+        KUBECONFIG      = "/home/user/.kube/config"  // WSL path to kubeconfig
     }
 
     stages {
