@@ -1,44 +1,32 @@
-# Part 1 Setup the environment to build the application
-# Maven Build, import maven image to build the application
+# ----------------------------------------------
+# Step 1: Build the application using Maven
+# ----------------------------------------------
 
 FROM maven:3.9.5-eclipse-temurin-21 AS build
+WORKDIR /app
 
-#Set working directory
-WORKDIR app
-
-#Copy pom.xml 
 COPY pom.xml .
-
-#Download all the dependencies
-
 RUN mvn dependency:go-offline
 
-#Copy the source code into the container
-
 COPY src ./src
-
-#Package the application
-
 RUN mvn clean package -DskipTests
 
-#-----------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------
+# Step 2: Set up runtime environment
+# ----------------------------------------------
 
-#Part 2 Step to run the application
-
-#Run the application
 FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
 
-#Set working directory
-WORKDIR app
+# copy the packaged jar file from the build stage
+COPY --from=build /app/target/auth-service.jar auth-service.jar
 
-#Copy the packaged jar file from the build stage
-COPY --from=build /app/target/asset-service-1.0.jar asset-service-1.0.jar
+# expose the port the application runs on
+EXPOSE 9000
 
-#Expose the port the application runs on
-EXPOSE 8082
+# command to run the application
+ENTRYPOINT ["java","-jar","auth-service.jar"]
 
-#Command to run the application
-ENTRYPOINT ["java","-jar","asset-service-1.0.jar"]
-#docker build -t asset-service:latest .
-#docker run -p 8082:8082 asset-service:latest
-
+# docker build -t auth-service:latest .
+# docker run -p 8083:8083 auth-service:latest
+# ----------------------------------------------
