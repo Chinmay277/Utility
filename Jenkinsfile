@@ -50,9 +50,8 @@ pipeline {
                             fullRedeploy = true
                         }
 
-                        // Root-level services
                         if (file.contains("/")) {
-                            services << file.split("/")[0]
+                            services.add(file.split("/")[0])
                         }
                     }
 
@@ -64,13 +63,15 @@ pipeline {
                         ).trim().split("\n")
                     }
 
-                    // ---- SANDBOX-SAFE DEDUPLICATION ----
-                    def uniqueServices = new HashSet()
+                    // ---- ABSOLUTELY SANDBOX-SAFE DEDUPLICATION ----
+                    def uniqueServices = []
                     services.each { svc ->
-                        uniqueServices.add(svc)
+                        if (!uniqueServices.contains(svc)) {
+                            uniqueServices.add(svc)
+                        }
                     }
-                    services = uniqueServices.toArray().toList()
-                    // -----------------------------------
+                    services = uniqueServices
+                    // ------------------------------------------------
 
                     if (services.isEmpty()) {
                         echo "No deployable services detected."
@@ -120,7 +121,7 @@ pipeline {
             steps {
                 script {
                     env.CHANGED_SERVICES.split(",").each { service ->
-                        echo "Deploying ${service} to Minikube"
+                        echo "Deploying ${service}"
 
                         sh """
                           sed -i 's|IMAGE_PLACEHOLDER|${DOCKER_REGISTRY}/${DOCKER_REPO}:${service}-${DOCKER_TAG}|' \
