@@ -50,20 +50,21 @@ pipeline {
                             fullRedeploy = true
                         }
 
+                        // normalize service name to lowercase
                         if (file.contains("/")) {
-                            services.add(file.split("/")[0])
+                            services.add(file.split("/")[0].toLowerCase())
                         }
                     }
 
                     if (fullRedeploy) {
                         echo "Manual redeploy requested. Deploying ALL services."
                         services = sh(
-                            script: "ls -d */ | grep -v k8s | grep -v .git | sed 's#/##'",
+                            script: "ls -d */ | grep -v k8s | grep -v .git | sed 's#/##' | tr '[:upper:]' '[:lower:]'",
                             returnStdout: true
                         ).trim().split("\n")
                     }
 
-                    // ---- ABSOLUTELY SANDBOX-SAFE DEDUPLICATION ----
+                    // ---- SANDBOX-SAFE DEDUPLICATION ----
                     def uniqueServices = []
                     services.each { svc ->
                         if (!uniqueServices.contains(svc)) {
@@ -71,7 +72,7 @@ pipeline {
                         }
                     }
                     services = uniqueServices
-                    // ------------------------------------------------
+                    // -----------------------------------
 
                     if (services.isEmpty()) {
                         echo "No deployable services detected."
