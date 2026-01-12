@@ -45,16 +45,14 @@ pipeline {
                     def fullRedeploy = false
 
                     changedList.each { file ->
+
                         if (file == "ManualReDeployer.txt") {
                             fullRedeploy = true
                         }
 
-                        // Root-level service folders
-                        def parts = file.split("/")
-                        if (parts.length > 1 && file.endsWith("/")) {
-                            services << parts[0]
-                        } else if (parts.length > 1) {
-                            services << parts[0]
+                        // Root-level services
+                        if (file.contains("/")) {
+                            services << file.split("/")[0]
                         }
                     }
 
@@ -66,8 +64,13 @@ pipeline {
                         ).trim().split("\n")
                     }
 
-                    // Jenkins sandbox-safe deduplication
-                    services = services.toSet().toList()
+                    // ---- SANDBOX-SAFE DEDUPLICATION ----
+                    def uniqueServices = new HashSet()
+                    services.each { svc ->
+                        uniqueServices.add(svc)
+                    }
+                    services = uniqueServices.toArray().toList()
+                    // -----------------------------------
 
                     if (services.isEmpty()) {
                         echo "No deployable services detected."
