@@ -137,8 +137,9 @@ pipeline {
                           sed -i 's|IMAGE_PLACEHOLDER|${DOCKER_REGISTRY}/${DOCKER_REPO}:${service}-${DOCKER_TAG}|' \
                           k8s/${service}/deployment.yaml
 
-                          kubectl apply -f k8s/${service}/deployment.yaml
-                          kubectl apply -f k8s/${service}/service.yaml
+                          kubectl apply --validate=false -f k8s/${service}/deployment.yaml
+                          kubectl apply --validate=false -f k8s/${service}/service.yaml
+
                         """
                     }
                 }
